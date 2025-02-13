@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Pencil Sketch App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            text-align: center;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .container {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        input[type="file"], input[type="range"], input[type="color"] {
+            margin: 10px 0;
+        }
+        .btn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .result img {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        canvas {
+            border: 1px solid black;
+            margin-top: 20px;
+            display: none;
+        }
+        #save-btn {
+            display: none;
+            margin-top: 10px;
+        }
+        .result {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hello, Welcome to the Personal Pencil Sketch App</h1>
+    <div class="container">
+        <input type="file" id="imageUpload" accept="image/*">
+        <button class="btn" onclick="uploadImage()">Upload and Convert</button>
+        <div class="result">
+            <h2>Converted Sketch</h2>
+            <img id="sketchImage" src="" alt="Converted Sketch">
+            <button class="btn" id="save-btn" onclick="saveImage()">Save Image</button>
+        </div>
+    </div>
+    <div class="container">
+        <h1>Customize Sketch</h1>
+        <div class="controls">
+            <button id="rotateLeftBtn">Rotate Left</button>
+            <button id="rotateRightBtn">Rotate Right</button>
+            <label>Intensity:</label>
+            <input type="range" id="intensitySlider" min="0" max="100" value="50">
+            <label>Stroke Size:</label>
+            <input type="range" id="strokeSlider" min="1" max="10" value="2">
+            <label>Color:</label>
+            <input type="color" id="colorPicker" value="#000000">
+        </div>
+    </div>
+    
+    <canvas id="imageCanvas"></canvas>
+
+    <script>
+        // Save Image function
+        function saveImage() {
+            const imageUrl = document.getElementById("sketchImage").src;
+            const link = document.createElement("a");
+            link.href = imageUrl;
+            link.download = "sketch.png";
+            link.click();
+        }
+
+        // Upload Image function with Preprocessing (resizing)
+        function uploadImage() {
+            const fileInput = document.getElementById("imageUpload");
+            if (fileInput.files.length === 0) {
+                alert("Please select an image first.");
+                return;
+            }
+            const uploadedFile = fileInput.files[0];
+            const formData = new FormData();
+            formData.append("file", uploadedFile);
+    
+            fetch("/upload/", {
+                method: "POST",
+                body: formData,
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Failed to upload image");
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.message === "File uploaded successfully") {
+                    alert("Image uploaded successfully!");
+                    convertImage(uploadedFile.name);
+                }
+            })
+            .catch(error => {
+                alert(error.message || "Failed to upload image");
+            });
+        }
+
+        // Convert Image (Grayscale + Sketch) with options for black & white or colored sketches
+        function convertImage(filename) {
+            fetch(`/convert/?filename=${filename}`, {
+                method: "POST",
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Failed to convert image");
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.message === "Image converted successfully") {
+                    const sketchImage = `/result/${data.processed_filename}`;
+                    document.getElementById("sketchImage").src = sketchImage;
+                    document.querySelector(".result").style.display = "block";
+                    document.getElementById("save-btn").style.display = "block";
+                    document.getElementById("imageCanvas").style.display = "block"; // Show canvas
+                }
+            })
+            .catch(error => {
+                alert(error.message || "Failed to convert image");
+            });
+        }
+
+        // Rotate image functions
+        document.getElementById("rotateLeftBtn").addEventListener("click", () => {
+            const filename = document.getElementById("sketchImage").src.split('/').pop();
+            rotateImage(filename, 'left');
+            updateSketch();  // Reapply customizations after rotation
+        });
+    
+        document.getElementById("rotateRightBtn").addEventListener("click", () => {
+            const filename = document.getElementById("sketchImage").src.split('/').pop();
+            rotateImage(filename, 'right');
+            updateSketch();  // Reapply customizations after rotation
+        });
+    
+        function rotateImage(filename, direction) {
+            fetch(`/rotate-${direction}/?filename=${filename}`, {
+                method: "POST",
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Failed to rotate image");
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.message.includes("successfully")) {
+                    const rotatedImage = `/result/${data.processed_filename}`;
+                    document.getElementById("sketchImage").src = rotatedImage;
+                }
+            })
+            .catch(error => {
+                alert(error.message || "Failed to rotate image");
+            });
+        }
+
+        // Update Sketch (Intensity, Stroke Size, Color)
+        document.getElementById("intensitySlider").addEventListener("input", updateSketch);
+        document.getElementById("strokeSlider").addEventListener("input", updateSketch);
+        document.getElementById("colorPicker").addEventListener("input", updateSketch);
+
+        function updateSketch() {
+            const intensity = document.getElementById("intensitySlider").value;
+            const strokeSize = document.getElementById("strokeSlider").value;
+            const color = document.getElementById("colorPicker").value;
+
+            // Apply the updates to the sketch image or canvas
+            const canvas = document.getElementById("imageCanvas");
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous sketch
+            
+            // For simplicity, let's assume you're working with a simple image
+            const sketchImage = document.getElementById("sketchImage");
+            
+            // Update canvas drawing properties
+            ctx.lineWidth = strokeSize;
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = intensity / 100;  // Convert intensity to a 0-1 scale
+            
+            // Redraw the image on canvas (this part needs to adjust based on your app logic)
+            ctx.drawImage(sketchImage, 0, 0);
+        }
+
+        // Voice Command Feature using Web Speech API
+        if ("webkitSpeechRecognition" in window) {
+            const recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = "en-US";
+
+            recognition.onstart = () => {
+                console.log("Voice recognition started. Speak now.");
+            };
+
+            recognition.onresult = (event) => {
+                const command = event.results[0][0].transcript.toLowerCase();
+                console.log(`Voice Command: ${command}`);
+                
+                if (command.includes("start")) {
+                    document.querySelector(".btn").click();
+                } else if (command.includes("stop")) {
+                    document.getElementById("save-btn").click();
+                } else if (command.includes("rotate left")) {
+                    document.getElementById("rotateLeftBtn").click();
+                } else if (command.includes("rotate right")) {
+                    document.getElementById("rotateRightBtn").click();
+                } else if (command.includes("convert")) {
+                    document.querySelector(".btn").click();
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error(`Error occurred in recognition: ${event.error}`);
+            };
+
+            // Start voice recognition on click
+            const startVoiceBtn = document.createElement('button');
+            startVoiceBtn.textContent = "Start Voice Command";
+            startVoiceBtn.classList.add("btn");
+            startVoiceBtn.addEventListener('click', () => {
+                recognition.start();
+            });
+
+            document.body.appendChild(startVoiceBtn);
+        }
+    </script>
+</body>
+</html>

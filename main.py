@@ -1,142 +1,172 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
-import cv2 as cv
+import cv2
 import numpy as np
-import io
-from PIL import Image
 import os
 import shutil
+import re
+import time
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from mimetypes import guess_type
 
+# Create directories for uploaded files and processed results if they don't exist
 UPLOAD_DIR = "uploads"
 RESULTS_DIR = "results"
 os.makedirs(UPLOAD_DIR, exist_ok=True)  # Ensure upload directory exists
 os.makedirs(RESULTS_DIR, exist_ok=True)  # Ensure results directory exists
 
-print("🚀 FastAPI is starting up!")
+# Allowed file extensions for uploads
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+
 app = FastAPI()
 
-def convert_to_pencil_sketch(image):
-    """Applies a pencil sketch effect using the Dodge Blend Technique."""
-    
-    # Convert image to grayscale
-    gray_image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    
-    # Invert the grayscale image
-    invert_image = cv.bitwise_not(gray_image)
+# Mount the "frontend" directory to serve static HTML, CSS, JS files
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
-    # Apply Gaussian blur to the inverted image
-    blur_image = cv.GaussianBlur(invert_image, (21, 21), 0)
+# Helper functions
+def is_allowed_file(filename: str) -> bool:
+    """Check if the file has an allowed extension."""
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-    # Invert the blurred image
-    invert_blur = cv.bitwise_not(blur_image)
+def sanitize_filename(filename: str) -> str:
+    """Sanitize the filename to prevent path traversal."""
+    return re.sub(r"[^a-zA-Z0-9_.-]", "_", filename)
 
-    # Blend the grayscale image with the inverted blurred image
-    sketch = cv.divide(gray_image, invert_blur, scale=256.0)
+def cleanup_old_files(directory: str, max_age_seconds: int = 86400):
+    """Delete files older than `max_age_seconds` in the given directory."""
+    current_time = time.time()
+    for filename in os.listdir(directory):
+        file_path = os.path.join(directory, filename)
+        if os.path.isfile(file_path):
+            file_age = current_time - os.path.getmtime(file_path)
+            if file_age > max_age_seconds:
+                os.remove(file_path)
 
-    return sketch
+# Clean up old files on startup
+cleanup_old_files(UPLOAD_DIR)
+cleanup_old_files(RESULTS_DIR)
 
+# Route to handle file upload
+@app.post("/upload/")
+async def upload_file(file: UploadFile = File(...)):
+    """Handles image uploads and saves the file to 'uploads/'."""
+    if not is_allowed_file(file.filename):
+        raise HTTPException(status_code=400, detail="File type not allowed. Only .png, .jpg, and .jpeg are supported.")
 
+    sanitized_filename = sanitize_filename(file.filename)
+    file_path = os.path.join(UPLOAD_DIR, sanitized_filename)
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        return {"message": "File uploaded successfully", "filename": sanitized_filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+
+# Route for converting the uploaded image to pencil sketch
 @app.post("/convert/")
 async def convert_image(filename: str):
-    """Loads an uploaded image, applies the pencil sketch filter, and saves the result."""
-    
+    """Converts the uploaded image to pencil sketch."""
     input_path = os.path.join(UPLOAD_DIR, filename)
     output_path = os.path.join(RESULTS_DIR, filename)
 
     if not os.path.exists(input_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Read the image using OpenCV
-    image = cv.imread(input_path)
-    if image is None:
-        raise HTTPException(status_code=400, detail="Error reading image file")
+    try:
+        img = cv2.imread(input_path)
+        if img is None:
+            raise HTTPException(status_code=400, detail="Invalid image file. Please upload a valid image.")
 
-    # Apply pencil sketch effect
-    sketch = convert_to_pencil_sketch(image)
+        # Convert the image to grayscale
+        gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # Save the processed image
-    cv.imwrite(output_path, sketch)
+        # Invert the grayscale image
+        inverted_image = 255 - gray_image
 
-    print(f"✅ Processed image saved: {output_path}")  # Debugging
+        # Blur the inverted image
+        blurred_image = cv2.GaussianBlur(inverted_image, (111, 111), 0)
 
-    return JSONResponse(content={"message": "Image converted successfully", "processed_filename": filename})
+        # Invert the blurred image
+        inverted_blurred_image = 255 - blurred_image
 
+        # Create the pencil sketch by blending the grayscale and inverted blurred images
+        pencil_sketch = cv2.divide(gray_image, inverted_blurred_image, scale=256.0)
+
+        # Save the resulting pencil sketch
+        cv2.imwrite(output_path, pencil_sketch)
+
+        # Return a success message with the filename of the processed image
+        return JSONResponse(content={"message": "Image converted successfully", "processed_filename": filename})
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to convert image: {str(e)}")
+
+# Route to rotate the image 90 degrees to the left (counterclockwise)
+@app.post("/rotate-left/")
+async def rotate_left(filename: str):
+    """Rotates the image 90 degrees left (counterclockwise)."""
+    input_path = os.path.join(UPLOAD_DIR, filename)
+    output_path = os.path.join(RESULTS_DIR, "rotated_left_" + filename)
+
+    if not os.path.exists(input_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        img = cv2.imread(input_path)
+        if img is None:
+            raise HTTPException(status_code=400, detail="Invalid image file. Please upload a valid image.")
+
+        # Rotate the image 90 degrees counterclockwise
+        rotated_image = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+        # Save the rotated image
+        cv2.imwrite(output_path, rotated_image)
+
+        # Return a success message with the filename of the processed image
+        return JSONResponse(content={"message": "Image rotated left successfully", "processed_filename": "rotated_left_" + filename})
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to rotate image left: {str(e)}")
+
+# Route to rotate the image 90 degrees to the right (clockwise)
+@app.post("/rotate-right/")
+async def rotate_right(filename: str):
+    """Rotates the image 90 degrees right (clockwise)."""
+    input_path = os.path.join(UPLOAD_DIR, filename)
+    output_path = os.path.join(RESULTS_DIR, "rotated_right_" + filename)
+
+    if not os.path.exists(input_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        img = cv2.imread(input_path)
+        if img is None:
+            raise HTTPException(status_code=400, detail="Invalid image file. Please upload a valid image.")
+
+        # Rotate the image 90 degrees clockwise
+        rotated_image = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+
+        # Save the rotated image
+        cv2.imwrite(output_path, rotated_image)
+
+        # Return a success message with the filename of the processed image
+        return JSONResponse(content={"message": "Image rotated right successfully", "processed_filename": "rotated_right_" + filename})
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to rotate image right: {str(e)}")
+
+# Route for fetching the converted result
 @app.get("/result/{filename}")
 async def get_result(filename: str):
     """Fetches the processed sketch image from the results directory."""
-    
     result_path = os.path.join(RESULTS_DIR, filename)
-    
     if not os.path.exists(result_path):
         raise HTTPException(status_code=404, detail="Processed image not found")
+    
+    media_type, _ = guess_type(result_path)
+    return FileResponse(result_path, media_type=media_type)
 
-    return FileResponse(result_path, media_type="image/png")
-
-@app.get("/test/")
-async def test():
-    print("✅ FastAPI received a test request!")  # Debug output
-    return {"message": "FastAPI is working"}
-
+# Route to serve the homepage
 @app.get("/")
 def home():
     return {"message": "FastAPI backend is running"}
-'''
-@app.post("/upload/")
-async def upload_file(file: UploadFile = File(...)):
-    """Handles image uploads and saves the file to 'uploads/' before processing."""
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-
-    try:
-        # Open the file in write mode and write the contents
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        print(f"✅ File saved: {file_path}")  # Debug: Check if file saves successfully
-
-        # Read the saved file back for processing
-        image = cv.imread(file_path)
-        if image is None:
-            raise HTTPException(status_code=400, detail="Error reading image after saving.")
-
-        # Convert image to pencil sketch
-        sketch = convert_to_pencil_sketch(image)
-
-        # Save the processed image
-        processed_path = os.path.join("results", file.filename)
-        os.makedirs("results", exist_ok=True)  # Ensure results folder exists
-        cv.imwrite(processed_path, sketch)
-        print(f"✅ Processed image saved: {processed_path}")
-
-        return JSONResponse(content={"message": "Image uploaded and processed successfully", "filename": file.filename})
-
-    except Exception as e:
-        print(f"❌ Error: {e}")  # Debugging
-        raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
-
-#-o NUL
-'''
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)  # Ensure the folder exists
-@app.post("/upload/")
-async def upload_file(file: UploadFile = File(...)):
-    """Handles image uploads and saves the file to 'uploads/' before processing."""
-    print(f"📥 Received request to upload: {file.filename}")  # Debug
-
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-
-    try:
-        print(f"📂 Saving file to: {file_path}")  # Debug
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        print(f"✅ File saved successfully: {file_path}")  # Debug
-        
-        return {"message": "File uploaded successfully", "filename": file.filename}
-
-    except Exception as e:
-        print(f"❌ Error saving file: {e}")  # Debug
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-
