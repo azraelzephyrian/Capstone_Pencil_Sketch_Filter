@@ -64,10 +64,11 @@
     <div class="container">
         <input type="file" id="imageUpload" accept="image/*">
         <button class="btn" onclick="uploadImage()">Upload and Convert</button>
-        <div class="result">
+        <div class="result" style="display: block;">
             <h2>Converted Sketch</h2>
             <img id="sketchImage" src="" alt="Converted Sketch">
             <button class="btn" id="save-btn" onclick="saveImage()">Save Image</button>
+            <button class="btn" id="colorize-btn">Colorize</button>
         </div>
     </div>
     <div class="container">
@@ -84,7 +85,8 @@
         </div>
     </div>
     
-    <canvas id="imageCanvas"></canvas>
+    <canvas id="imageCanvas" style="border: 1px solid black; margin-top: 20px; max-width: 100%;"></canvas>
+
 
     <script>
         // Save Image function

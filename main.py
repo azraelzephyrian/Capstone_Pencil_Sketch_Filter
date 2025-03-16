@@ -64,7 +64,10 @@ async def upload_file(file: UploadFile = File(...)):
 
 # Route for converting the uploaded image to pencil sketch
 @app.post("/convert/")
-async def convert_image(filename: str):
+@app.post("/convert/")
+async def convert_image(filename: str, intensity: int = 50, stroke_size: int = 3, colorize: bool = False):
+
+
     """Converts the uploaded image to pencil sketch."""
     input_path = os.path.join(UPLOAD_DIR, filename)
     output_path = os.path.join(RESULTS_DIR, filename)
@@ -77,8 +80,17 @@ async def convert_image(filename: str):
         if img is None:
             raise HTTPException(status_code=400, detail="Invalid image file. Please upload a valid image.")
 
+        # Convert the image to HSV to extract hue & saturation for colorization
+        hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        hue_channel, saturation_channel, _ = cv2.split(hsv_image)
+
         # Convert the image to grayscale
         gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Apply intensity adjustment (higher intensity = darker sketch)
+        adjusted_gray = np.clip(gray_image * (intensity / 50.0), 0, 255).astype(np.uint8)
+
+
 
         # Invert the grayscale image
         inverted_image = 255 - gray_image
@@ -90,10 +102,27 @@ async def convert_image(filename: str):
         inverted_blurred_image = 255 - blurred_image
 
         # Create the pencil sketch by blending the grayscale and inverted blurred images
-        pencil_sketch = cv2.divide(gray_image, inverted_blurred_image, scale=256.0)
+                # Create the pencil sketch by blending the adjusted grayscale and inverted blurred images
+        pencil_sketch = cv2.divide(adjusted_gray, inverted_blurred_image, scale=256.0)
 
         # Save the resulting pencil sketch
-        cv2.imwrite(output_path, pencil_sketch)
+        # Apply stroke effect by blurring based on stroke size
+        if stroke_size > 1:
+            pencil_sketch = cv2.GaussianBlur(pencil_sketch, (stroke_size * 2 + 1, stroke_size * 2 + 1), 0)
+
+        # Save the resulting pencil sketch
+        if colorize:
+            # Combine hue & saturation with sketch intensity
+            colorized_hsv = cv2.merge((hue_channel, saturation_channel, pencil_sketch))
+            colorized_image = cv2.cvtColor(colorized_hsv, cv2.COLOR_HSV2BGR)
+
+            # Save the colorized sketch
+            cv2.imwrite(output_path, colorized_image)
+        else:
+            # Save the regular pencil sketch
+            cv2.imwrite(output_path, pencil_sketch)
+
+
 
         # Return a success message with the filename of the processed image
         return JSONResponse(content={"message": "Image converted successfully", "processed_filename": filename})
@@ -101,15 +130,45 @@ async def convert_image(filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to convert image: {str(e)}")
 
-# Route to rotate the image 90 degrees to the left (counterclockwise)
-@app.post("/rotate-left/")
-async def rotate_left(filename: str):
-    """Rotates the image 90 degrees left (counterclockwise)."""
-    input_path = os.path.join(UPLOAD_DIR, filename)
-    output_path = os.path.join(RESULTS_DIR, "rotated_left_" + filename)
+@app.post("/update-image/")
+async def update_image(filename: str, intensity: int, stroke: int):
+    """Updates the processed image with new intensity and stroke values."""
+    input_path = os.path.join(RESULTS_DIR, filename)
+    output_path = os.path.join(RESULTS_DIR, f"updated_{intensity}_{stroke}_" + filename)
 
     if not os.path.exists(input_path):
         raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        img = cv2.imread(input_path, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            raise HTTPException(status_code=400, detail="Invalid image file")
+
+        # Apply intensity adjustment (scale grayscale values)
+        img = cv2.multiply(img, (intensity / 100.0))
+
+        # Apply stroke size effect (Gaussian blur)
+        if stroke > 1:
+            img = cv2.GaussianBlur(img, (2 * stroke + 1, 2 * stroke + 1), 0)
+
+        # Save the updated image
+        cv2.imwrite(output_path, img)
+
+        return {"message": "Image updated successfully", "processed_filename": f"updated_{intensity}_{stroke}_" + filename}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update image: {str(e)}")
+
+# Route to rotate the image 90 degrees to the left (counterclockwise)
+
+@app.post("/rotate-left/")
+async def rotate_left(filename: str):
+    """Rotates the most recent sketch 90 degrees left (counterclockwise)."""
+    input_path = os.path.join(RESULTS_DIR, filename)  # Ensure rotation uses the processed sketch
+    output_path = os.path.join(RESULTS_DIR, "rotated_left_" + filename)
+
+    if not os.path.exists(input_path):
+        raise HTTPException(status_code=404, detail="Processed sketch file not found")
 
     try:
         img = cv2.imread(input_path)
@@ -122,7 +181,6 @@ async def rotate_left(filename: str):
         # Save the rotated image
         cv2.imwrite(output_path, rotated_image)
 
-        # Return a success message with the filename of the processed image
         return JSONResponse(content={"message": "Image rotated left successfully", "processed_filename": "rotated_left_" + filename})
     
     except Exception as e:
@@ -131,12 +189,12 @@ async def rotate_left(filename: str):
 # Route to rotate the image 90 degrees to the right (clockwise)
 @app.post("/rotate-right/")
 async def rotate_right(filename: str):
-    """Rotates the image 90 degrees right (clockwise)."""
-    input_path = os.path.join(UPLOAD_DIR, filename)
+    """Rotates the most recent sketch 90 degrees right (clockwise)."""
+    input_path = os.path.join(RESULTS_DIR, filename)  # Ensure rotation uses the processed sketch
     output_path = os.path.join(RESULTS_DIR, "rotated_right_" + filename)
 
     if not os.path.exists(input_path):
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail="Processed sketch file not found")
 
     try:
         img = cv2.imread(input_path)
@@ -149,11 +207,11 @@ async def rotate_right(filename: str):
         # Save the rotated image
         cv2.imwrite(output_path, rotated_image)
 
-        # Return a success message with the filename of the processed image
         return JSONResponse(content={"message": "Image rotated right successfully", "processed_filename": "rotated_right_" + filename})
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to rotate image right: {str(e)}")
+
 
 # Route for fetching the converted result
 @app.get("/result/{filename}")
