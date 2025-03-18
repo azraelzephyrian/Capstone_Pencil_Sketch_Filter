@@ -173,7 +173,15 @@ def postprocess_image(tensor):
     return np.clip(tensor * 255, 0, 255).astype(np.uint8)
 
 app = FastAPI()
-app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+import os
+from fastapi.staticfiles import StaticFiles
+
+frontend_path = "frontend"
+if not os.path.exists(frontend_path):
+    os.makedirs(frontend_path)  # Create directory if missing
+
+app.mount("/frontend", StaticFiles(directory=frontend_path), name="frontend")
+
 
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
