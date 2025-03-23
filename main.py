@@ -571,6 +571,62 @@ async def convert_to_gaussian_sketch_endpoint(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
 
+@app.post("/convert_with_stroke/")
+async def convert_with_stroke(
+    filename: str,
+    stroke_length: int = 5,
+    stroke_thickness: int = 1,
+    inv_density: float = 0.7,
+):
+    """Converts the uploaded image by overlaying tapered pencil strokes perpendicular to edges."""
+    input_path = os.path.join(UPLOAD_DIR, filename)
+    output_path = os.path.join(RESULTS_DIR, f"stroke_{filename}")
+
+    if not os.path.exists(input_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        # Load image in grayscale
+        image = cv2.imread(input_path, cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            raise HTTPException(status_code=400, detail="Invalid image file.")
+
+        # Detect edges using Canny
+        edges = cv2.Canny(image, 100, 200)
+
+        # Compute gradient direction
+        sobelx = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=5)
+        sobely = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=5)
+        angles = np.arctan2(sobely, sobelx)  # Edge direction
+
+        # Compute perpendicular direction (90 degrees rotated)
+        angles_perp = angles + np.pi / 2
+
+        # Create an output color image
+        output = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+
+        # Find edge coordinates
+        edge_points = np.argwhere(edges > 0)
+
+        # Draw perpendicular strokes
+        for y, x in edge_points:
+            if np.random.rand() < inv_density:
+                continue
+            angle = angles_perp[y, x]
+            dx = round(np.cos(angle) * stroke_length / 2)
+            dy = round(np.sin(angle) * stroke_length / 2)
+            pt1 = (x - dx, y - dy)
+            pt2 = (x + dx, y + dy)
+            cv2.line(output, pt1, pt2, (0, 0, 0), thickness=stroke_thickness, lineType=cv2.LINE_AA)
+
+        # Save the result
+        cv2.imwrite(output_path, output)
+
+        return JSONResponse(content={"message": "Image processed with pencil strokes", "processed_filename": f"stroke_{filename}"})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+    
 @app.post("/convert_to_cel_shade/")
 async def convert_to_cel_shade(
     filename: str,
