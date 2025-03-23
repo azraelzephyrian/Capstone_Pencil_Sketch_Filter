@@ -147,24 +147,19 @@ from fastapi.staticfiles import StaticFiles
 from mimetypes import guess_type
 
 # Import trained model
-app = FastAPI()
-# Create directories for uploaded files and processed results if they don't exist
+
 UPLOAD_DIR = "uploads"
 RESULTS_DIR = "results"
-FRONTEND_DIR = "frontend"
+os.makedirs(UPLOAD_DIR, exist_ok=True)  
+os.makedirs(RESULTS_DIR, exist_ok=True)  
+
+# Load trained model
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-os.makedirs(UPLOAD_DIR, exist_ok=True)  # Ensure upload directory exists
-os.makedirs(RESULTS_DIR, exist_ok=True)
-os.makedirs(FRONTEND_DIR, exist_ok=True)
+CHECKPOINT_PATH = "pix2pix_checkpoint_pencil.pth"
+#CHECKPOINT_PATH = "pix2pix_checkpoint_edge_detect.pth"
 
-# Mount the directories to serve static files
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
-app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend")
-
-# Allowed file extensions for uploads
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
-
+if not os.path.exists(CHECKPOINT_PATH):
+    raise FileNotFoundError(f"Checkpoint not found: {CHECKPOINT_PATH}")
 
 def load_trained_model(checkpoint_path):
     """Loads the trained Pix2Pix generator model."""
@@ -174,10 +169,8 @@ def load_trained_model(checkpoint_path):
     generator.eval()
     return generator
 
-PENCIL_CHECKPOINT_PATH = "pix2pix_checkpoint_pencil.pth"
-EDGE_CHECKPOINT_PATH = "pix2pix_checkpoint_edge_detect.pth"
-model_pencil = load_trained_model(PENCIL_CHECKPOINT_PATH)
-model_edge = load_trained_model(EDGE_CHECKPOINT_PATH)
+model = load_trained_model(CHECKPOINT_PATH)
+
 def preprocess_image(image_path):
     """Loads and preprocesses an image for the model."""
     img = Image.open(image_path).convert("RGB")
@@ -194,8 +187,17 @@ def postprocess_image(tensor):
     tensor = (tensor * 0.5) + 0.5  # Undo normalization
     return np.clip(tensor * 255, 0, 255).astype(np.uint8)
 
+UPLOAD_DIR = "uploads"
+RESULTS_DIR = "results"
+os.makedirs(UPLOAD_DIR, exist_ok=True)  
+os.makedirs(RESULTS_DIR, exist_ok=True)  
 
+# Load trained model
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+CHECKPOINT_PATH = "pix2pix_checkpoint_pencil.pth"
+#CHECKPOINT_PATH = "pix2pix_checkpoint_edge_detect.pth"
 
+app = FastAPI()
 
 # Define allowed origins (for CORS)
 origins = [
@@ -212,8 +214,21 @@ app.add_middleware(
     allow_headers=["*"],    # Allow all headers
 )
 
+# Create directories for uploaded files and processed results if they don't exist
+UPLOAD_DIR = "uploads"
+RESULTS_DIR = "results"
+os.makedirs(UPLOAD_DIR, exist_ok=True)  # Ensure upload directory exists
+os.makedirs(RESULTS_DIR, exist_ok=True)  # Ensure results directory exists
+
+# Mount the "uploads" directory to serve static files
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+# Allowed file extensions for uploads
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
 
+# Mount the "frontend" directory to serve static HTML, CSS, JS files
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 # Helper functions
 def is_allowed_file(filename: str) -> bool:
@@ -258,7 +273,7 @@ async def upload_file_GAN(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
 
 
-@app.post("/generate_pencil_sketch_GAN/")
+@app.post("/generate-sketch_GAN/")
 async def generate_sketch_with_model_GAN(filename: str):
     """Uses the trained model to generate a sketch from the uploaded image."""
     input_path = os.path.join(UPLOAD_DIR, filename)
@@ -270,30 +285,7 @@ async def generate_sketch_with_model_GAN(filename: str):
     try:
         img_tensor = preprocess_image(input_path)
         with torch.no_grad():
-            generated_sketch = model_pencil(img_tensor)
-
-        sketch_image = postprocess_image(generated_sketch)
-
-        cv2.imwrite(output_path, sketch_image)
-
-        return JSONResponse(content={"message": "Sketch generated successfully", "processed_filename": "gan_sketch_" + filename})
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate sketch: {str(e)}")
-    
-@app.post("/generate_edge_sketch_GAN/")
-async def generate_sketch_with_model_GAN(filename: str):
-    """Uses the trained model to generate a sketch from the uploaded image."""
-    input_path = os.path.join(UPLOAD_DIR, filename)
-    output_path = os.path.join(RESULTS_DIR, "gan_sketch_" + filename)
-
-    if not os.path.exists(input_path):
-        raise HTTPException(status_code=404, detail="File not found")
-
-    try:
-        img_tensor = preprocess_image(input_path)
-        with torch.no_grad():
-            generated_sketch = model_edge(img_tensor)
+            generated_sketch = model(img_tensor)
 
         sketch_image = postprocess_image(generated_sketch)
 
@@ -481,208 +473,6 @@ async def rotate_right(filename: str):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to rotate image right: {str(e)}")
-
-def gaussian_splat(image, num_splats=2000, sigma=3.0, spread=5):
-    """Applies Gaussian splatting across the entire image with better coverage."""
-    
-    height, width, _ = image.shape
-    output = np.zeros_like(image, dtype=np.float32)
-
-    # Generate random points for Gaussian splatting
-    x_coords = np.random.randint(0, width, size=num_splats)
-    y_coords = np.random.randint(0, height, size=num_splats)
-
-    for i in range(num_splats):
-        x, y = x_coords[i], y_coords[i]
-        
-        # Sample color from original image
-        color = image[y, x]
-
-        # Create Gaussian splat over a larger spread
-        for dx in range(-spread, spread + 1):  
-            for dy in range(-spread, spread + 1):  
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < width and 0 <= ny < height:
-                    weight = np.exp(-(dx**2 + dy**2) / (2 * sigma**2))
-                    output[ny, nx] += weight * color
-
-    # Apply Gaussian blur to fill gaps
-    output = cv2.GaussianBlur(output, (7, 7), sigma)
-
-    # Normalize colors
-    output = np.clip(output, 0, 255).astype(np.uint8)
-
-    return output
-
-
-@app.post("/convert_to_gaussian_sketch/")
-async def convert_to_gaussian_sketch_endpoint(
-    filename: str,
-    blur_ksize: int = 5,
-    canny_thresh1: int = 50,
-    canny_thresh2: int = 150,
-    dilate_iter: int = 1,
-    alpha_blend: float = 0.6,
-    num_gaussians: int = 5000,
-    sigma: float = 2.0,
-    edge_alpha: float = 0.85,
-):
-    """Converts the uploaded image to a colored sketch using Gaussian splatting and edge blending."""
-    input_path = os.path.join(UPLOAD_DIR, filename)
-    output_path = os.path.join(RESULTS_DIR, f"colored_{filename}")
-
-    if not os.path.exists(input_path):
-        raise HTTPException(status_code=404, detail="File not found")
-
-    try:
-        img = cv2.imread(input_path)
-        if img is None:
-            raise HTTPException(status_code=400, detail="Invalid image file.")
-
-        # Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        # Apply Gaussian Blur
-        blurred = cv2.GaussianBlur(gray, (blur_ksize, blur_ksize), 0)
-
-        # Detect edges
-        edges = cv2.Canny(blurred, canny_thresh1, canny_thresh2)
-
-        # Dilation
-        kernel = np.ones((2, 2), np.uint8)
-        edges_dilated = cv2.dilate(edges, kernel, iterations=dilate_iter)
-
-        # Gaussian splatting
-        splatted_colors = gaussian_splat(img, num_splats=num_gaussians, sigma=sigma)
-
-        # Invert edges and convert to 3 channels
-        edges_inv = cv2.bitwise_not(edges_dilated)
-        edges_inv = cv2.cvtColor(edges_inv, cv2.COLOR_GRAY2BGR)
-
-        # Blend edges over splatted colors
-        colored_sketch = cv2.addWeighted(splatted_colors, alpha_blend, img, 1 - alpha_blend, 0)
-        colored_sketch = cv2.addWeighted(colored_sketch, edge_alpha, edges_inv, 1 - edge_alpha, 0)
-
-        # Save result
-        cv2.imwrite(output_path, colored_sketch)
-
-        return JSONResponse(content={"message": "Image converted to colored sketch", "processed_filename": f"colored_{filename}"})
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
-
-@app.post("/convert_to_cel_shade/")
-async def convert_to_cel_shade(
-    filename: str,
-    bilateral_d: int = 9,
-    bilateral_sigmaColor: int = 75,
-    bilateral_sigmaSpace: int = 75,
-    median_blur_ksize: int = 7,
-    canny_thresh1: int = 50,
-    canny_thresh2: int = 150,
-):
-    """Converts the uploaded image to a cel-shaded sketch using bilateral filter and edge detection."""
-    input_path = os.path.join(UPLOAD_DIR, filename)
-    output_path = os.path.join(RESULTS_DIR, f"cel_shade_{filename}")
-
-    if not os.path.exists(input_path):
-        raise HTTPException(status_code=404, detail="File not found")
-
-    try:
-        img = cv2.imread(input_path)
-        if img is None:
-            raise HTTPException(status_code=400, detail="Invalid image file.")
-
-        # Apply bilateral filter
-        bilateral_filtered = cv2.bilateralFilter(img, d=bilateral_d, sigmaColor=bilateral_sigmaColor, sigmaSpace=bilateral_sigmaSpace)
-
-        # Convert to grayscale
-        gray = cv2.cvtColor(bilateral_filtered, cv2.COLOR_BGR2GRAY)
-
-        # Apply median blur
-        blurred = cv2.medianBlur(gray, median_blur_ksize)
-
-        # Detect edges
-        edges = cv2.Canny(blurred, threshold1=canny_thresh1, threshold2=canny_thresh2)
-
-        # Invert edges
-        edges_inv = cv2.bitwise_not(edges)
-
-        # Convert to BGR
-        edges_inv_colored = cv2.cvtColor(edges_inv, cv2.COLOR_GRAY2BGR)
-
-        # Combine with filtered image
-        cel_shaded = cv2.bitwise_and(bilateral_filtered, edges_inv_colored)
-
-        # Save the result
-        cv2.imwrite(output_path, cel_shaded)
-
-        return JSONResponse(content={"message": "Image converted to cel-shaded style", "processed_filename": f"cel_shade_{filename}"})
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
-
-from sklearn.cluster import KMeans
-
-@app.post("/convert_to_poster/")
-async def convert_to_poster(
-    filename: str,
-    posterize_levels: int = 16,
-    color_intensity: float = 0.9,
-    gamma: float = 1.3,
-):
-    """Converts the uploaded image to a poster-style sketch with color quantization and bold edges."""
-    input_path = os.path.join(UPLOAD_DIR, filename)
-    output_path = os.path.join(RESULTS_DIR, f"poster_{filename}")
-
-    if not os.path.exists(input_path):
-        raise HTTPException(status_code=404, detail="File not found")
-
-    try:
-        img = cv2.imread(input_path)
-        if img is None:
-            raise HTTPException(status_code=400, detail="Invalid image file.")
-
-        # Bilateral filter to smooth colors
-        bilateral_filtered = cv2.bilateralFilter(img, d=9, sigmaColor=75, sigmaSpace=75)
-
-        # Posterization via K-Means
-        def quantize_image(image, k=8):
-            img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            pixels = img_rgb.reshape(-1, 3)
-            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10).fit(pixels)
-            quantized_img = kmeans.cluster_centers_[kmeans.labels_].reshape(img_rgb.shape)
-            return cv2.cvtColor(quantized_img.astype(np.uint8), cv2.COLOR_RGB2BGR)
-
-        quantized = quantize_image(bilateral_filtered, k=posterize_levels)
-
-        # Grayscale and median blur
-        gray = cv2.cvtColor(quantized, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.medianBlur(gray, 7)
-
-        # Edge detection and enhancement
-        edges = cv2.Canny(bilateral_filtered, 50, 150)
-        edges = cv2.dilate(edges, np.ones((2, 2), np.uint8), iterations=1)
-        edges = cv2.convertScaleAbs(edges, alpha=1.5, beta=0)
-        sharp_edges = cv2.addWeighted(edges, 2, cv2.GaussianBlur(edges, (5, 5), 0), -1, 0)
-        edges_inv = cv2.bitwise_not(sharp_edges)
-        edges_inv_colored = cv2.cvtColor(edges_inv, cv2.COLOR_GRAY2BGR)
-
-        # Softening and gamma correction
-        gray_colored = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-        desaturated = cv2.addWeighted(quantized, color_intensity, gray_colored, 1 - color_intensity, 0)
-        gamma_corrected = np.array(255 * (desaturated / 255) ** (1 / gamma), dtype=np.uint8)
-
-        # Final blend
-        poster_style = cv2.bitwise_and(gamma_corrected, edges_inv_colored)
-
-        # Save the output
-        cv2.imwrite(output_path, poster_style)
-
-        return JSONResponse(content={"message": "Image converted to poster style", "processed_filename": f"poster_{filename}"})
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
 
 
 # Route for fetching the converted result
