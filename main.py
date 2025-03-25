@@ -145,6 +145,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from mimetypes import guess_type
+from scipy.spatial import Voronoi
 
 # Import trained model
 app = FastAPI()
@@ -481,6 +482,81 @@ async def rotate_right(filename: str):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to rotate image right: {str(e)}")
+
+def sample_points_by_detail(image, num_points=1000):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=5)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=5)
+    magnitude = np.sqrt(sobelx**2 + sobely**2)
+    prob_map = magnitude / (np.sum(magnitude) + 1e-8)
+    prob_map_flat = prob_map.flatten()
+
+    ys, xs = np.indices((image.shape[:2]))
+    coords = np.column_stack((xs.flatten(), ys.flatten()))
+    indices = np.random.choice(len(coords), size=num_points, p=prob_map_flat)
+    return coords[indices]
+
+def voronoi_mosaic_adaptive(image, num_cells=1000, edge_thickness=1, edge_color=(0, 0, 0), padding=20):
+    h, w = image.shape[:2]
+    padded = cv2.copyMakeBorder(image, padding, padding, padding, padding, borderType=cv2.BORDER_REFLECT)
+    hp, wp = padded.shape[:2]
+
+    sampled_coords = sample_points_by_detail(padded, num_cells)
+    points = sampled_coords
+
+    vor = Voronoi(points)
+    output = np.zeros_like(padded)
+
+    for region_idx in vor.point_region:
+        region = vor.regions[region_idx]
+        if -1 in region or len(region) == 0:
+            continue
+
+        polygon = [vor.vertices[i] for i in region]
+        polygon_np = np.array([polygon], dtype=np.int32)
+
+        mask = np.zeros((hp, wp), dtype=np.uint8)
+        cv2.fillPoly(mask, polygon_np, 255)
+
+        mean_color = cv2.mean(padded, mask=mask)[:3]
+        mean_color_bgr = tuple(map(int, mean_color))
+        cv2.fillPoly(output, polygon_np, mean_color_bgr)
+
+        if edge_thickness > 0:
+            cv2.polylines(output, polygon_np, isClosed=True, color=edge_color, thickness=edge_thickness)
+
+    return output[padding:-padding, padding:-padding]
+
+@app.post("/convert_to_mosaic/")
+async def convert_to_mosaic(
+    filename: str,
+    num_cells: int = 1000,
+    edge_thickness: int = 1,
+):
+    """
+    Converts the uploaded image to a Voronoi-style mosaic with adaptive detail density.
+    """
+    input_path = os.path.join(UPLOAD_DIR, filename)
+    output_path = os.path.join(RESULTS_DIR, f"mosaic_{filename}")
+
+    if not os.path.exists(input_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        image = cv2.imread(input_path)
+        if image is None:
+            raise HTTPException(status_code=400, detail="Invalid image file.")
+
+        mosaic = voronoi_mosaic_adaptive(image, num_cells=num_cells, edge_thickness=edge_thickness)
+        cv2.imwrite(output_path, mosaic)
+
+        return JSONResponse(content={
+            "message": "Image processed with Voronoi mosaic",
+            "processed_filename": f"mosaic_{filename}"
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
 
 def gaussian_splat(image, num_splats=2000, sigma=3.0, spread=5):
     """Applies Gaussian splatting across the entire image with better coverage."""
