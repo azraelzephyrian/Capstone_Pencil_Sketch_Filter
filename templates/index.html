@@ -152,26 +152,33 @@
       </button>
       <form class="filter-form" action="/cel-shade" method="post">
         <label>Bilateral d:
-          <input type="number" name="bilateral_d" value="9"/>
+          <input type="number" name="bilateral_d" value="9" min="1" max="25" />
         </label>
         <label>Bilateral Sigma Color:
-          <input type="number" name="bilateral_sigmaColor" value="75"/>
+          <input type="number" name="bilateral_sigmaColor" value="75" min="1" max="250" />
         </label>
         <label>Bilateral Sigma Space:
-          <input type="number" name="bilateral_sigmaSpace" value="75"/>
+          <input type="number" name="bilateral_sigmaSpace" value="75" min="1" max="250" />
         </label>
         <label>Median Blur ksize:
-          <input type="number" name="median_blur_ksize" value="7"/>
+          <input type="number" name="median_blur_ksize" value="7" step="2" min="3" max="31" />
         </label>
         <label>Canny Thresh1:
-          <input type="number" name="canny_thresh1" value="50"/>
+          <input type="number" name="canny_thresh1" value="50" min="0" max="255" />
         </label>
         <label>Canny Thresh2:
-          <input type="number" name="canny_thresh2" value="150"/>
+          <input type="number" name="canny_thresh2" value="150" min="0" max="255" />
         </label>
+        <label>Num Colors:
+          <input type="number" name="num_colors" value="12" min="4" max="24" />
+        </label>
+        <label>Edge Thickness:
+          <input type="number" name="edge_thickness" value="2" min="1" max="5"/>
+        </label>        
         <button class="btn" type="submit">Apply Cel Shading</button>
       </form>
     </div>
+    
 
     <!-- Poster Filter Section -->
     <div class="filter-section">
