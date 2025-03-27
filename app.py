@@ -1,7 +1,7 @@
 # flask_image_editor.py
 import os
 import uuid
-from flask import Flask, request, session, send_file, jsonify, render_template, redirect, url_for
+from flask import Flask, request, session, send_file, jsonify, request, render_template, redirect, url_for
 from werkzeug.utils import secure_filename
 import cv2
 import numpy as np
@@ -353,52 +353,72 @@ def stroke_route():
         return redirect(url_for("index"))
     except Exception as e:
         return f"Error applying stroke transformation: {str(e)}", 500
-
+from sklearn.cluster import MiniBatchKMeans
 
 @app.route('/cel-shade', methods=['POST'])
 def cel_shade_route():
-    """Converts the uploaded image to a cel-shaded sketch using bilateral filter + edge detection."""
+    from sklearn.cluster import MiniBatchKMeans
+
     path = get_active_image_path()
     if not os.path.exists(path):
         return "No active image found", 400
 
-    # Parse optional parameters
-    bilateral_d = int(request.form.get('bilateral_d', 9))
-    bilateral_sigmaColor = int(request.form.get('bilateral_sigmaColor', 75))
-    bilateral_sigmaSpace = int(request.form.get('bilateral_sigmaSpace', 75))
-    median_blur_ksize = int(request.form.get('median_blur_ksize', 7))
-    canny_thresh1 = int(request.form.get('canny_thresh1', 50))
-    canny_thresh2 = int(request.form.get('canny_thresh2', 150))
-
     try:
+        # Parameters
+        bilateral_d = int(request.form.get('bilateral_d', 9))
+        bilateral_sigmaColor = int(request.form.get('bilateral_sigmaColor', 75))
+        bilateral_sigmaSpace = int(request.form.get('bilateral_sigmaSpace', 75))
+        median_blur_ksize = int(request.form.get('median_blur_ksize', 7))
+        canny_thresh1 = int(request.form.get('canny_thresh1', 50))
+        canny_thresh2 = int(request.form.get('canny_thresh2', 150))
+        num_colors = int(request.form.get('num_colors', 12))  # ~12–20 gives stylized color without grayscale
+
+        # Load and preprocess
         img = cv2.imread(path)
         if img is None:
             return "Could not read active image", 400
 
-        # Bilateral filter
-        bilateral_filtered = cv2.bilateralFilter(
-            img,
-            d=bilateral_d,
-            sigmaColor=bilateral_sigmaColor,
-            sigmaSpace=bilateral_sigmaSpace
-        )
+        smoothed = cv2.bilateralFilter(img, d=bilateral_d,
+                                       sigmaColor=bilateral_sigmaColor,
+                                       sigmaSpace=bilateral_sigmaSpace)
 
-        # Grayscale + median blur
-        gray = cv2.cvtColor(bilateral_filtered, cv2.COLOR_BGR2GRAY)
+        # Color quantization with MiniBatchKMeans
+        def quantize_image(image, k=8):
+            img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            small = cv2.resize(img_rgb, (0, 0), fx=0.2, fy=0.2)
+            pixels = small.reshape(-1, 3)
+            kmeans = MiniBatchKMeans(n_clusters=k, batch_size=1000, random_state=42).fit(pixels)
+            labels = kmeans.predict(img_rgb.reshape(-1, 3))
+            quantized = kmeans.cluster_centers_[labels].reshape(img_rgb.shape)
+            return cv2.cvtColor(quantized.astype(np.uint8), cv2.COLOR_RGB2BGR)
+
+        quantized = quantize_image(smoothed, k=num_colors)
+
+        # Edge detection on quantized image
+        gray = cv2.cvtColor(quantized, cv2.COLOR_BGR2GRAY)
         blurred = cv2.medianBlur(gray, median_blur_ksize)
+        edges = cv2.Canny(blurred, canny_thresh1, canny_thresh2)
 
-        # Edges
-        edges = cv2.Canny(blurred, threshold1=canny_thresh1, threshold2=canny_thresh2)
+        # NEW: Edge thickness control
+        edge_thickness = int(request.form.get('edge_thickness', 1))
+        kernel = np.ones((edge_thickness, edge_thickness), np.uint8)
+        edges = cv2.dilate(edges, kernel, iterations=1)
+
         edges_inv = cv2.bitwise_not(edges)
         edges_inv_colored = cv2.cvtColor(edges_inv, cv2.COLOR_GRAY2BGR)
 
-        # Combine
-        cel_shaded = cv2.bitwise_and(bilateral_filtered, edges_inv_colored)
+        # Overlay black edges over quantized image
+        cel_shaded = cv2.multiply(quantized, edges_inv_colored, scale=1/255.0)
 
         cv2.imwrite(path, cel_shaded)
         return redirect(url_for("index"))
     except Exception as e:
         return f"Error applying cel-shade transformation: {str(e)}", 500
+
+
+
+
+
 
 
 @app.route('/poster', methods=['POST'])
@@ -422,12 +442,22 @@ def poster_route():
         bilateral_filtered = cv2.bilateralFilter(img, d=9, sigmaColor=75, sigmaSpace=75)
 
         # Posterization via K-Means
-        def quantize_image(image, k=8):
+        def quantize_image(image, k=16):
             img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            pixels = img_rgb.reshape(-1, 3)
-            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10).fit(pixels)
-            quantized_img = kmeans.cluster_centers_[kmeans.labels_].reshape(img_rgb.shape)
+
+            # Downsample for faster clustering
+            small = cv2.resize(img_rgb, (0, 0), fx=0.2, fy=0.2, interpolation=cv2.INTER_LINEAR)
+            pixels = small.reshape(-1, 3)
+
+            # Fit KMeans on small image
+            kmeans = MiniBatchKMeans(n_clusters=k, batch_size=1000, random_state=42).fit(pixels)
+
+            # Apply those clusters to full-res image
+            labels = kmeans.predict(img_rgb.reshape(-1, 3))
+            quantized_img = kmeans.cluster_centers_[labels].reshape(img_rgb.shape)
+
             return cv2.cvtColor(quantized_img.astype(np.uint8), cv2.COLOR_RGB2BGR)
+
 
         quantized = quantize_image(bilateral_filtered, k=posterize_levels)
 
@@ -455,7 +485,7 @@ def poster_route():
     except Exception as e:
         return f'Error applying poster transformation: {str(e)}', 500
     
-    from flask import Flask, request, jsonify
+
 
 from flask import redirect, url_for
 
