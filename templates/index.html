@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pencil Sketch App</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f7f7f7;
+      padding: 40px;
+      text-align: center;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 800px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .container h1 {
+      margin-top: 0;
+    }
+    .filter-section {
+      border-top: 1px solid #ccc;
+      padding-top: 20px;
+      margin-top: 20px;
+    }
+    form {
+      margin: 10px 0;
+    }
+    label {
+      margin: 0 10px;
+    }
+    input[type='number'] {
+      width: 80px;
+    }
+    .btn {
+      padding: 10px 20px;
+      margin: 10px 5px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background-color: #45a049;
+    }
+    img {
+      max-width: 100%;
+      margin-top: 20px;
+      border: 1px solid #ccc;
+    }
+    .filter-form {
+      display: none;
+    }
+    .filter-section h2 {
+      cursor: pointer;
+      user-select: none;
+    }
+    /* optional: hide outline when button is clicked */
+    button:focus {
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🖋️ Pencil Sketch App</h1>
+
+    <!-- Upload Form -->
+    <form action="/upload" method="post" enctype="multipart/form-data">
+      <input type="file" name="file" accept="image/*" required>
+      <button class="btn" type="submit">Upload</button>
+    </form>
+
+    <!-- Basic Buttons: Pencil, Rotate, Download -->
+    <form action="/convert/pencil" method="post">
+      <button class="btn" type="submit">Pencil Sketch</button>
+    </form>
+
+    <form action="/rotate/left" method="post">
+      <button class="btn" type="submit">Rotate Left</button>
+    </form>
+    <form action="/rotate/right" method="post">
+      <button class="btn" type="submit">Rotate Right</button>
+    </form>
+    <form action="/download" method="get">
+      <button class="btn" type="submit">Download Sketch</button>
+    </form>
+
+    <!-- Display Active Image -->
+    <div>
+      <img src="/active-image" alt="Current Active Image"
+           onerror="this.style.display='none';"
+      >
+    </div>
+    
+    <div class="filter-section">
+      <button class="btn show-params-btn" type="button" onclick="toggleFilter(this)">
+        Show Colorize With Image
+      </button>
+      <form class="filter-form" action="/colorize_with_image" method="post" enctype="multipart/form-data">
+        <label>Upload Color Source Image:
+          <input type="file" name="color_source" accept="image/*" required />
+        </label>
+        <button class="btn" type="submit">Apply Colorization</button>
+      </form>
+    </div>
+    
+
+    <!-- Mosaic Section -->
+    <div class="filter-section">
+      <button class="btn show-params-btn" type="button" onclick="toggleFilter(this)">
+        Show Mosaic Parameters
+      </button>
+      <form class="filter-form" action="/mosaic" method="post">
+        <label>Num Cells:
+          <input type="number" name="num_cells" value="2000" />
+        </label>
+        <label>Edge Thickness:
+          <input type="number" name="edge_thickness" value="1" />
+        </label>
+        <button class="btn" type="submit">Apply Mosaic</button>
+      </form>
+    </div>
+
+    <!-- Stroke Filter Section -->
+    <div class="filter-section">
+      <button class="btn show-params-btn" type="button" onclick="toggleFilter(this)">
+        Show Stroke Parameters
+      </button>
+      <form class="filter-form" action="/stroke" method="post">
+        <label>Stroke Length:
+          <input type="number" name="stroke_length" value="5"/>
+        </label>
+        <label>Stroke Thickness:
+          <input type="number" name="stroke_thickness" value="1"/>
+        </label>
+        <label>Inverse Density:
+          <input type="number" name="inv_density" step="0.1" value="0.7"/>
+        </label>
+        <button class="btn" type="submit">Apply Stroke</button>
+      </form>
+    </div>
+
+    <!-- Cel Shading Section -->
+    <div class="filter-section">
+      <button class="btn show-params-btn" type="button" onclick="toggleFilter(this)">
+        Show Cel Shading Parameters
+      </button>
+      <form class="filter-form" action="/cel-shade" method="post">
+        <label>Bilateral d:
+          <input type="number" name="bilateral_d" value="9"/>
+        </label>
+        <label>Bilateral Sigma Color:
+          <input type="number" name="bilateral_sigmaColor" value="75"/>
+        </label>
+        <label>Bilateral Sigma Space:
+          <input type="number" name="bilateral_sigmaSpace" value="75"/>
+        </label>
+        <label>Median Blur ksize:
+          <input type="number" name="median_blur_ksize" value="7"/>
+        </label>
+        <label>Canny Thresh1:
+          <input type="number" name="canny_thresh1" value="50"/>
+        </label>
+        <label>Canny Thresh2:
+          <input type="number" name="canny_thresh2" value="150"/>
+        </label>
+        <button class="btn" type="submit">Apply Cel Shading</button>
+      </form>
+    </div>
+
+    <!-- Poster Filter Section -->
+    <div class="filter-section">
+      <button class="btn show-params-btn" type="button" onclick="toggleFilter(this)">
+        Show Poster Parameters
+      </button>
+      <form class="filter-form" action="/poster" method="post">
+        <label>Posterize Levels:
+          <input type="number" name="posterize_levels" value="16"/>
+        </label>
+        <label>Color Intensity:
+          <input type="number" name="color_intensity" step="0.1" value="0.9"/>
+        </label>
+        <label>Gamma:
+          <input type="number" name="gamma" step="0.1" value="1.3"/>
+        </label>
+        <button class="btn" type="submit">Apply Poster</button>
+      </form>
+    </div>
+
+    <!-- Gaussian Sketch Section -->
+    <div class="filter-section">
+      <button class="btn show-params-btn" type="button" onclick="toggleFilter(this)">
+        Show Gaussian Parameters
+      </button>
+      <form class="filter-form" action="/gaussian-sketch" method="post">
+        <label>Blur ksize:
+          <input type="number" name="blur_ksize" value="5"/>
+        </label>
+        <label>Canny Thresh1:
+          <input type="number" name="canny_thresh1" value="50"/>
+        </label>
+        <label>Canny Thresh2:
+          <input type="number" name="canny_thresh2" value="150"/>
+        </label>
+        <label>Dilate Iter:
+          <input type="number" name="dilate_iter" value="1"/>
+        </label>
+        <label>Alpha Blend:
+          <input type="number" name="alpha_blend" step="0.1" value="0.6"/>
+        </label>
+        <label>Num Gaussians:
+          <input type="number" name="num_gaussians" value="5000"/>
+        </label>
+        <label>Sigma:
+          <input type="number" name="sigma" step="0.1" value="2.0"/>
+        </label>
+        <label>Edge Alpha:
+          <input type="number" name="edge_alpha" step="0.1" value="0.85"/>
+        </label>
+        <button class="btn" type="submit">Apply Gaussian Sketch</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <button class="btn show-params-btn" type="button" onclick="toggleFilter(this)">
+      Show GAN Pencil Sketch
+    </button>
+    <form class="filter-form" action="/generate_pencil_sketch_GAN/" method="post">
+      <button class="btn" type="submit">Generate Pencil Sketch</button>
+    </form>
+  </div>
+  
+  <div class="filter-section">
+    <button class="btn show-params-btn" type="button" onclick="toggleFilter(this)">
+      Show GAN Edge Sketch
+    </button>
+    <form class="filter-form" action="/generate_edge_sketch_GAN/" method="post">
+      <button class="btn" type="submit">Generate Edge Sketch</button>
+    </form>
+  </div>
+  
+  
+
+  <!-- Voice Command Button -->
+  <button class="btn" id="voice-command-btn">🎤 Start Voice Command</button>
+
+  <!-- Audio element for button-click sounds -->
+  <audio id="click-sound" src="/static/click.mp3" preload="auto"></audio>
+
+  <script>
+    // Plays a short click sound
+    function playClickSound() {
+      const audio = document.getElementById("click-sound");
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play();
+      }
+    }
+
+    // Toggle filter visibility
+    function toggleFilter(button) {
+      playClickSound();  // Play sound on filter toggle button
+      const form = button.nextElementSibling;
+      if (form && form.classList.contains('filter-form')) {
+        form.style.display = 'block';
+        button.style.display = 'none';
+      }
+    }
+
+    // Voice Commands
+    if ("webkitSpeechRecognition" in window) {
+      const recognition = new webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        console.log("🎤 Listening...");
+      };
+
+      recognition.onresult = (event) => {
+        const command = event.results[0][0].transcript.toLowerCase();
+        console.log("🎧 Heard:", command);
+
+        // Insert a click sound for each voice command
+        playClickSound();
+
+        if (command.includes("pencil")) {
+          document.querySelector("form[action='/convert/pencil'] button").click();
+        } else if (command.includes("rotate left")) {
+          document.querySelector("form[action='/rotate/left'] button").click();
+        } else if (command.includes("rotate right")) {
+          document.querySelector("form[action='/rotate/right'] button").click();
+        } else if (command.includes("download") || command.includes("save")) {
+          document.querySelector("form[action='/download'] button").click();
+        } else if (command.includes("mosaic")) {
+          document.querySelector("form[action='/mosaic'] button").click();
+        } else if (command.includes("gaussian")) {
+          document.querySelector("form[action='/gaussian-sketch'] button").click();
+        } else if (command.includes("stroke")) {
+          document.querySelector("form[action='/stroke'] button").click();
+        } else if (command.includes("poster")) {
+          document.querySelector("form[action='/poster'] button").click();
+        } else if (command.includes("cel")) {
+          document.querySelector("form[action='/cel-shade'] button").click();
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("💥 Voice recognition error:", event.error);
+      };
+
+      // Start listening on voice button click
+      document.getElementById("voice-command-btn").addEventListener("click", () => {
+        recognition.start();
+      });
+    } else {
+      // Hide button if not supported
+      document.getElementById("voice-command-btn").style.display = "none";
+      alert("Your browser does not support voice recognition.");
+    }
+
+    // OPTIONAL: Add a click sound to any manual button press
+    document.querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        playClickSound();
+      });
+    });
+  </script>
+</body>
+</html>
