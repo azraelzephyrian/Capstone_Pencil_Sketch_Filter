@@ -353,15 +353,11 @@
               .querySelector("form[action='/convert/pencil'] button")
               .click();
           } else if (command.includes("rotate left")) {
-            document
-              .querySelector("form[action='/rotate/left'] button")
-              .click();
+            document.querySelector("form[action='/rotate/left']").submit();
           } else if (command.includes("rotate right")) {
-            document
-              .querySelector("form[action='/rotate/right'] button")
-              .click();
+            document.querySelector("form[action='/rotate/right']").submit();
           } else if (command.includes("download") || command.includes("save")) {
-            document.querySelector("form[action='/download'] button").click();
+            document.querySelector("a[href='/download']").click();
           } else if (command.includes("mosaic")) {
             document.querySelector("form[action='/mosaic'] button").click();
           } else if (command.includes("gaussian")) {
