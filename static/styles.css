@@ -1,0 +1,356 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    transition: all 0.3s ease;
+  }
+
+  body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #6e7f93, #b9c2cc);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    padding: 20px;
+    overflow: hidden;
+  }
+
+  .container {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 850px;
+    max-height: 90vh;
+    overflow-y: auto;
+    text-align: center;
+    background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(240, 240, 240, 1) 100%);
+  }
+
+  .container h1 {
+    color: #333;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 25px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+/* Button Styling */
+.btn {
+display: inline-block;
+background: linear-gradient(145deg, #ffffff, #e0e0e0);
+border: 2px solid #d1d1d1;
+border-radius: 10px;
+padding: 10px 20px;
+font-size: 18px;
+font-weight: bold;
+color: #333;
+cursor: pointer;
+transition: all 0.3s ease-in-out;
+box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2), -3px -3px 8px rgba(255, 255, 255, 0.7);
+text-align: center;
+}
+
+/* Hover Effect */
+.btn:hover {
+background: linear-gradient(145deg, #f0f0f0, #d1d1d1);
+box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.3), -2px -2px 5px rgba(255, 255, 255, 0.5);
+}
+
+/* Click (Active) Effect */
+.btn:active {
+background: linear-gradient(145deg, #d1d1d1, #f0f0f0);
+box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.2), inset -2px -2px 5px rgba(255, 255, 255, 0.7);
+transform: scale(0.98);
+}
+
+  input[type="file"], input[type="number"] {
+    margin: 12px 0;
+    padding: 12px 18px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    width: 100%;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  input[type="file"]:focus, input[type="number"]:focus {
+    border-color: #56ccf2;
+    outline: none;
+  }
+
+  .upload-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .upload-wrapper input[type="file"] {
+    margin-right: 10px;
+  }
+
+  .active-image-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid #ccc;
+  }
+
+  .active-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s ease;
+    transform-origin: center;
+  }
+
+  .rotate-buttons {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .rotate-buttons button, .download-icon {
+    margin: 5px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    background-color: #8a9797;
+    color: rgb(14, 14, 14);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .rotate-buttons button:hover, .download-icon:hover {
+    background-color: #726e6e;
+  }
+
+  .download-icon {
+    font-size: 30px;
+    transition: all 0.3s ease;
+    color:#f9f9f9;
+  }
+
+  .download-icon:hover {
+    color: #090909;
+    transform: scale(1.1);
+  }
+
+  .filter-section {
+    border-top: 2px solid #eaeaea;
+    margin-top: 25px;
+    padding-top: 25px;
+  }
+
+/* Form Styling */
+.filter-form {
+padding: 15px;
+background: #fafafa;
+border-radius: 10px;
+box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+margin-bottom: 20px;
+}
+
+/* Section Header Buttons */
+.filter-section h2 {
+background: #252525; 
+color: #f0eaea; 
+padding: 20px;
+border-radius: 12px; 
+font-family: 'Arial', sans-serif; 
+font-size: 14px;
+cursor: pointer;
+text-align: center;
+width: 150px; 
+height: 150px; 
+display: flex;
+justify-content: center;
+align-items: center; 
+box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.1), -5px -5px 10px rgba(255, 255, 255, 0.7); /* Neumorphic shadow */
+transition: all 0.3s ease;
+}
+
+.filter-section h2:hover {
+background: #414040; /* Slightly darker grey on hover */
+box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), -5px -5px 15px rgba(255, 255, 255, 0.6); /* Stronger shadow on hover */
+}
+
+.filter-section h2:active {
+background: #b0b0b0; /* Darker grey when clicked */
+box-shadow: inset 5px 5px 10px rgba(0, 0, 0, 0.2), inset -5px -5px 10px rgba(255, 255, 255, 0.5); /* Inset shadow when clicked */
+}
+
+.filter-section {
+display: flex;
+flex-wrap: wrap;
+justify-content: space-around;
+margin-top: 30px;
+}
+
+.filter-section h2 {
+margin: 10px; /* Space between buttons */
+}
+
+
+  .filter-form label {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #444;
+  }
+
+  .filter-form input {
+    width: 100%;
+    max-width: 250px;
+  }
+
+  .voice-command-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #1807022c;
+    border: none;
+    color: rgb(255, 255, 255);
+    padding: 18px 40px;
+    border-radius: 50px;
+    cursor: pointer;
+    margin-top: 30px;
+    font-size: 1.4rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+  }
+
+  .voice-command-btn:hover {
+    background-color: #373433;
+    box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .voice-command-btn:active {
+    background-color: #3e3a39;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+  }
+
+
+  .basic-buttons {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+  }
+
+  .basic-buttons form {
+    margin-bottom: 20px;
+  }
+
+  .filter-section .filter-form input {
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .filter-section .filter-form input:focus {
+    border-color: #2f80ed;
+  }
+
+  .filter-form {
+    display: none;
+    margin-top: 10px;
+  }
+
+  .filter-form input {
+    margin-bottom: 10px;
+    padding: 8px;
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+  }
+
+  .filter-section h2 {
+    cursor: pointer;
+    color: #d4dae3;
+  }
+
+  /* Styling for the heading */
+  h1 {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 3rem;
+    color: #333;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+    position: relative;
+  }
+
+  h1::before {
+    content: '🖋️';
+    font-size: 3.5rem;
+    position: absolute;
+    top: -15px;
+    left: -50px;
+    color: #555;
+    animation: pencil-animation 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pencil-animation {
+    0% {
+      transform: rotate(0deg);
+    }
+    50% {
+      transform: rotate(-20deg);
+    }
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+
+  /* Adding a light effect for depth */
+  h1 span {
+    display: inline-block;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Adding glow effect */
+  h1 span::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.6));
+    filter: blur(8px);
+    z-index: -1;
+    animation: glow 1.5s infinite alternate;
+  }
+
+  @keyframes glow {
+    0% {
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+    }
+    100% {
+      box-shadow: 0 0 20px rgba(255, 255, 255, 1);
+    }
+  }
