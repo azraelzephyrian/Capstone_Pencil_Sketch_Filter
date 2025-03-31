@@ -22,14 +22,6 @@ from GAN import (
 )
 
 
-# Set paths to your trained model checkpoint files
-PENCIL_MODEL_PATH = "pix2pix_checkpoint_pencil.pth"
-EDGE_MODEL_PATH = "pix2pix_checkpoint_edge_detect.pth"
-
-# Initialize the models
-initialize_models(PENCIL_MODEL_PATH, EDGE_MODEL_PATH)
-
-
 
 PENCIL_MODEL_PATH = "pix2pix_checkpoint_pencil.pth"
 EDGE_MODEL_PATH = "pix2pix_checkpoint_edge_detect.pth"
