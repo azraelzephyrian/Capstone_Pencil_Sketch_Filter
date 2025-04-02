@@ -6,6 +6,9 @@ from werkzeug.utils import secure_filename
 import cv2
 import numpy as np
 import torch
+from scipy.spatial import Voronoi
+from sklearn.cluster import KMeans
+from sklearn.cluster import MiniBatchKMeans
 
 print("✅ Flask app running from correct file!")
 
@@ -138,11 +141,6 @@ def download():
         return "No image uploaded", 400
     return send_file(path, as_attachment=True, download_name="sketch.png")
 
-import cv2
-import numpy as np
-from flask import Flask, request, session, send_file, render_template, redirect, url_for
-from scipy.spatial import Voronoi
-from sklearn.cluster import KMeans
 
 # Make sure these exist or are imported
 def sample_points_by_detail(image, num_points=1000):
@@ -345,11 +343,10 @@ def stroke_route():
         return redirect(url_for("index"))
     except Exception as e:
         return f"Error applying stroke transformation: {str(e)}", 500
-from sklearn.cluster import MiniBatchKMeans
+
 
 @app.route('/cel-shade', methods=['POST'])
 def cel_shade_route():
-    from sklearn.cluster import MiniBatchKMeans
 
     path = get_active_image_path()
     if not os.path.exists(path):
@@ -479,8 +476,6 @@ def poster_route():
     
 
 
-from flask import redirect, url_for
-
 @app.route("/generate_pencil_sketch_GAN/", methods=["POST"])
 def generate_pencil_sketch():
     path = get_active_image_path()
@@ -514,7 +509,7 @@ def generate_edge_sketch():
     except Exception as e:
         return f"Error generating edge sketch: {str(e)}", 500
     
-from flask import request, redirect, url_for
+
 
 @app.route("/colorize_with_image", methods=["POST"])
 def colorize_with_image():
@@ -565,4 +560,4 @@ def colorize_with_image():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0")
