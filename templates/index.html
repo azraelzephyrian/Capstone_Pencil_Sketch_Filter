@@ -37,6 +37,12 @@
         </form>
       </div>
 
+      <div class="basic-buttons">
+        <button class="voice-command-btn" id="voice-command-btn">
+          <span class="icon">🎤</span> Start Voice Command
+        </button>
+      </div>
+      
       <!-- Active Image Display with Rotate Buttons -->
       <div class="active-image-container">
         <img
@@ -295,11 +301,6 @@
           <button class="btn" type="submit">Generate Edge Sketch</button>
         </form>
       </div>
-
-      <!-- Voice Command Button -->
-      <button class="voice-command-btn" id="voice-command-btn">
-        <span class="icon">🎤</span> Start Voice Command
-      </button>
     </div>
 
     <audio id="click-sound" src="/static/click.mp3" preload="auto"></audio>
@@ -345,63 +346,155 @@
         }
       }
 
-      // Voice Commands
       if ("webkitSpeechRecognition" in window) {
         const recognition = new webkitSpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = "en-US";
 
+        const micButton = document.getElementById("voice-command-btn");
+
         recognition.onstart = () => {
           console.log("🎤 Listening...");
+          micButton.classList.add("listening");
         };
 
-        recognition.onresult = (event) => {
-          const command = event.results[0][0].transcript.toLowerCase();
-          console.log("🎧 Heard:", command);
-          playClickSound();
-          if (command.includes("pencil")) {
-            document
-              .querySelector("form[action='/convert/pencil'] button")
-              .click();
-          } else if (command.includes("rotate left")) {
-            document.querySelector("form[action='/rotate/left']").submit();
-          } else if (command.includes("rotate right")) {
-            document.querySelector("form[action='/rotate/right']").submit();
-          } else if (command.includes("download") || command.includes("save")) {
-            document.querySelector("a[href='/download']").click();
-          } else if (command.includes("mosaic")) {
-            document.querySelector("form[action='/mosaic'] button").click();
-          } else if (command.includes("gaussian")) {
-            document
-              .querySelector("form[action='/gaussian-sketch'] button")
-              .click();
-          } else if (command.includes("stroke")) {
-            document.querySelector("form[action='/stroke'] button").click();
-          } else if (command.includes("poster")) {
-            document.querySelector("form[action='/poster'] button").click();
-          } else if (command.includes("cel")) {
-            document.querySelector("form[action='/cel-shade'] button").click();
-          }
-          else if (command.includes("resize")) {
-            document.querySelector("form[action='/resize'] button").click();
+        recognition.onend = () => {
+          micButton.classList.remove("listening");
+        };
+
+        async function interpretTranscript(transcript) {
+          console.log("📤 Sending transcript to backend:", transcript);
+          const response = await fetch("/interpret_voice_command", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ transcript }),
+          });
+
+          const data = await response.json();
+          return data;
+        }
+
+        async function promptUserForParam(paramName) {
+          return new Promise((resolve) => {
+            recognition.onresult = async (event) => {
+              const followup = event.results[0][0].transcript.toLowerCase();
+              console.log(`🎧 Received value for ${paramName}:`, followup);
+
+              const parsedValue = followup.match(/\d+/);
+              if (parsedValue) {
+                resolve(parsedValue[0]); // Return just the number
+              } else {
+                alert(`Could not understand a numeric value for ${paramName}. Try again.`);
+                resolve(await promptUserForParam(paramName)); // Retry recursively
+              }
+            };
+            recognition.start();
+          });
+        }
+
+        async function processVoiceCommand(transcript) {
+          const intent = await interpretTranscript(transcript);
+          console.log("🧠 LLM response:", intent);
+
+          const action = intent.action;
+          const known = intent.params?.known || {};
+          const missing = intent.params?.missing || [];
+
+          const allParams = { ...known };
+
+          // If there are missing parameters, ask the user for them one-by-one
+          for (const param of missing) {
+            const userValue = await promptUserForParam(param);
+            allParams[param] = userValue;
           }
 
-        };
+          // Dispatch action once all values are gathered
+          switch (action) {
+            case "ROTATE LEFT":
+              document.querySelector("form[action='/rotate/left']").submit();
+              break;
+            case "ROTATE RIGHT":
+              document.querySelector("form[action='/rotate/right']").submit();
+              break;
+            case "DOWNLOAD":
+              document.querySelector("a[href='/download']").click();
+              break;
+            case "APPLY RESIZE":
+              fillFormAndSubmit("/resize", allParams);
+              break;
+            case "APPLY CEL SHADE":
+              fillFormAndSubmit("/cel-shade", allParams);
+              break;
+            case "APPLY POSTER":
+              fillFormAndSubmit("/poster", allParams);
+              break;
+            case "APPLY GAUSSIAN":
+              fillFormAndSubmit("/gaussian-sketch", allParams);
+              break;
+            case "APPLY MOSAIC":
+              fillFormAndSubmit("/mosaic", allParams);
+              break;
+            case "APPLY STROKE":
+              fillFormAndSubmit("/stroke", allParams);
+              break;
+            case "APPLY COLORIZATION":
+              alert("Voice colorization only works with a file input. Please upload manually.");
+              break;
+            case "APPLY PENCIL":
+              document.querySelector("form[action='/convert/pencil'] button").click();
+              break;
+            case "APPLY GAN PENCIL":
+              document.querySelector("form[action='/generate_pencil_sketch_GAN/'] button").click();
+              break;
+            case "APPLY GAN EDGE":
+              document.querySelector("form[action='/generate_edge_sketch_GAN/'] button").click();
+              break;
+            case "UNKNOWN":
+            default:
+              alert("Sorry, I didn't understand the command.");
+          }
+        }
+
+        function fillFormAndSubmit(actionPath, params) {
+          const form = document.querySelector(`form[action='${actionPath}']`);
+          if (!form) {
+            alert("Form not found for action: " + actionPath);
+            return;
+          }
+
+          for (const [key, value] of Object.entries(params)) {
+            const input = form.querySelector(`[name='${key}']`);
+            if (input) {
+              input.value = value;
+            }
+          }
+
+          // Submit
+          form.querySelector("button[type='submit']").click();
+        }
+
+        micButton.addEventListener("click", () => {
+          recognition.onresult = async (event) => {
+            const transcript = event.results[0][0].transcript.toLowerCase();
+            playClickSound();
+            console.log("🎧 Heard:", transcript);
+            await processVoiceCommand(transcript);
+          };
+          recognition.start();
+        });
 
         recognition.onerror = (event) => {
           console.error("💥 Voice recognition error:", event.error);
+          micButton.classList.remove("listening");
         };
-
-        document
-          .getElementById("voice-command-btn")
-          .addEventListener("click", () => {
-            recognition.start();
-          });
       } else {
         document.getElementById("voice-command-btn").style.display = "none";
         alert("Your browser does not support voice recognition.");
       }
+
 
       document.querySelectorAll("button").forEach((btn) => {
         btn.addEventListener("click", () => {
