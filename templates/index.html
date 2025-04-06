@@ -87,6 +87,18 @@
       </div>
 
       <div class="filter-section">
+        <h2 onclick="toggleFilter(this)" class="btn">RESIZE IMAGE</h2>
+        <form class="filter-form" action="/resize" method="post">
+          <label>
+            Scale Percent:
+            <input type="number" name="scale_percent" value="100" min="1" max="500" />
+          </label>
+          <button class="btn" type="submit">Apply Resize</button>
+        </form>
+      </div>
+      
+
+      <div class="filter-section">
         <h2 onclick="toggleFilter(this)" class="btn">MOSAIC PARAMETERS</h2>
         <form class="filter-form" action="/mosaic" method="post">
           <label
@@ -371,6 +383,10 @@
           } else if (command.includes("cel")) {
             document.querySelector("form[action='/cel-shade'] button").click();
           }
+          else if (command.includes("resize")) {
+            document.querySelector("form[action='/resize'] button").click();
+          }
+
         };
 
         recognition.onerror = (event) => {
