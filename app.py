@@ -9,8 +9,16 @@ import torch
 from scipy.spatial import Voronoi
 from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
+from dotenv import load_dotenv
 import openai
 import json
+
+load_dotenv()  # Load variables from .env into environment
+
+openai.api_key = os.environ.get("OPENAI_API_KEY")
+
+
+
 
 
 print("✅ Flask app running from correct file!")
@@ -733,6 +741,9 @@ def explain_query():
         Example:
 
         ["To change the number of colors in cel shading,", "Scroll to the cel shading section.", "Then adjust the 'num colors' field.", "Click apply."]
+
+        Note that, to colorize an image, the user must first convert the main image to a pencil sketch or other greyscale image (stroke and GAN filters work too), 
+        click on the colorize button, which will show an additional upload button.  The user must then upload the color source image, and click apply. 
 
         The user asked:
         """ + question
