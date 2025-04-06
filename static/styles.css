@@ -375,4 +375,24 @@ margin: 10px; /* Space between buttons */
       box-shadow: 0 0 10px rgba(255, 75, 75, 0.6);
     }
   }
+
+  #voice-help-overlay {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    max-width: 300px;
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+  }
+  
+  #voice-help-overlay.show {
+    opacity: 1;
+    visibility: visible;
+  }
   

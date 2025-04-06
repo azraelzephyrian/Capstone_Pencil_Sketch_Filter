@@ -41,6 +41,9 @@
         <button class="voice-command-btn" id="voice-command-btn">
           <span class="icon">🎤</span> Start Voice Command
         </button>
+        <button class="btn" id="tutorial-btn">
+          ❓ Voice Tutorial
+        </button>        
       </div>
       
       <!-- Active Image Display with Rotate Buttons -->
@@ -412,6 +415,30 @@
           }
 
           // Dispatch action once all values are gathered
+          if (action === "HELP") {
+            speakTutorial();
+            return;
+          }
+
+          if (action === "EXPLAIN" && intent.question) {
+            const response = await fetch("/explain_query", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ question: intent.question }),
+            });
+
+            const data = await response.json();
+            if (data.lines) {
+              speakTutorial(data.lines);
+            } else {
+              alert("Sorry, I couldn't explain that.");
+            }
+            return;
+          }
+
+
           switch (action) {
             case "ROTATE LEFT":
               document.querySelector("form[action='/rotate/left']").submit();
@@ -501,6 +528,42 @@
           playClickSound();
         });
       });
+
+        const tutorialLines = [
+          "Welcome to the Pencil Sketch App!",
+          "You can upload an image using the Upload button at the top.",
+          "To interact using voice, click the microphone button and say commands like:",
+          "Rotate left, Apply Poster, Apply Gaussian Sketch, or Resize to 80 percent.",
+          "For filters like cel shading or resizing, you can specify parameters like size or number of colors; to see a list of available parameters, click on the filter you wish to inspect.",
+          "Once processed, you can download your final image by saying 'download' or clicking the download arrow.",
+          "That's the basics! Say 'help' again if you'd like to hear this tutorial once more, or ask for specific explanations of how to use any of the filters."
+        ];
+
+        function speakTutorial(lines = tutorialLines) {
+          const synth = window.speechSynthesis;
+          const voices = synth.getVoices();
+          const voice = voices.find(v => v.lang.startsWith("en")) || null;
+
+          let i = 0;
+          function speakNext() {
+            if (i >= lines.length) return;
+            const utterance = new SpeechSynthesisUtterance(lines[i]);
+            if (voice) utterance.voice = voice;
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            utterance.onend = speakNext;
+            synth.speak(utterance);
+            i++;
+          }
+
+          speakNext();
+        }
+
+        document.getElementById("tutorial-btn").addEventListener("click", () => {
+          speakTutorial();
+        });
+
+
     </script>
   </body>
 </html>
