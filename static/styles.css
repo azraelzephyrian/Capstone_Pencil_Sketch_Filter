@@ -395,4 +395,69 @@ margin: 10px; /* Space between buttons */
     opacity: 1;
     visibility: visible;
   }
+
+  .glow-highlight {
+    position: relative;
+    z-index: 10;
+    outline: 3px solid rgba(80, 170, 255, 0.6); /* fallback glow */
+    outline-offset: 2px;
+  
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.4),
+      0 0 12px 4px rgba(80, 170, 255, 0.9),
+      0 0 20px 10px rgba(80, 170, 255, 0.4);
+  
+    animation: glowPulse 1.2s ease-in-out infinite !important;
+    transition: none !important;
+  }
+  
+  
+  @keyframes glowPulse {
+    0% {
+      box-shadow:
+        0 0 0 3px rgba(255, 255, 255, 0.2),
+        0 0 12px 2px rgba(80, 170, 255, 0.5);
+    }
+    50% {
+      box-shadow:
+        0 0 0 3px rgba(255, 255, 255, 0.4),
+        0 0 18px 8px rgba(80, 170, 255, 1);
+    }
+    100% {
+      box-shadow:
+        0 0 0 3px rgba(255, 255, 255, 0.2),
+        0 0 12px 2px rgba(80, 170, 255, 0.5);
+    }
+  }
+  
+/* Active Filter Section */
+.active-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 20px;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+
+.active-filter h2 {
+  margin: 0;
+}
+
+.active-filter form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Filter Grid Layout */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  justify-items: center;
+  margin: 20px 0;
+}
+
+  
   

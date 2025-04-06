@@ -744,7 +744,7 @@ def explain_query():
 
         Note that, to colorize an image, the user must first convert the main image to a pencil sketch or other greyscale image (stroke and GAN filters work too), 
         click on the colorize button, which will show an additional upload button.  The user must then upload the color source image, and click apply. 
-
+        To rotate the image, the user must first upload an image, then click the rotate buttons (highlighted).  There is no apply button for save/download/rotation. 
         The user asked:
         """ + question
 
